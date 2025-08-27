@@ -18,8 +18,9 @@ record FolderFileSink(Path path) implements FileSink {
     public void putFile(String relativePath, FileTime lastModified, byte[] content) throws IOException {
         var targetPath = path.resolve(relativePath);
 
-        if (targetPath.getParent() != null && !Files.isDirectory(targetPath.getParent()))
+        if (targetPath.getParent() != null && !Files.isDirectory(targetPath.getParent())) {
             Files.createDirectories(targetPath.getParent());
+        }
 
         Files.write(targetPath, content);
         Files.setLastModifiedTime(targetPath, lastModified);
