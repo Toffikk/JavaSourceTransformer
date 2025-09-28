@@ -12,7 +12,14 @@ public class Example {
         applyFlags(6);
         applyFlags(155);
         applyFlags(-1);
+
+        applyFlags(-7);
+        applyFlags(-17);
+        applyFlags(344);
+
+        applyHexFlags(155);
     }
 
     public static void applyFlags(int flags) {}
+    public static void applyHexFlags(int flags) {}
 }

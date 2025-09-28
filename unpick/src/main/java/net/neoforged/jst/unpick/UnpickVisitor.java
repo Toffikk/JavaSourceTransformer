@@ -1,6 +1,7 @@
 package net.neoforged.jst.unpick;
 
 import com.intellij.openapi.util.Key;
+import com.intellij.openapi.util.text.StringUtil;
 import com.intellij.psi.JavaTokenType;
 import com.intellij.psi.PsiAssignmentExpression;
 import com.intellij.psi.PsiCallExpression;
@@ -21,6 +22,7 @@ import com.intellij.psi.PsiRecursiveElementVisitor;
 import com.intellij.psi.PsiReferenceExpression;
 import com.intellij.psi.PsiReturnStatement;
 import com.intellij.psi.PsiVariable;
+import com.intellij.psi.util.ClassUtil;
 import daomephsta.unpick.constantmappers.datadriven.tree.GroupFormat;
 import daomephsta.unpick.constantmappers.datadriven.tree.Literal;
 import daomephsta.unpick.constantmappers.datadriven.tree.TargetMethod;
@@ -244,10 +246,10 @@ public class UnpickVisitor extends PsiRecursiveElementVisitor {
         if (Boolean.TRUE.equals(tok.getUserData(UNPICK_WAS_REPLACED))) return;
 
         if (tok.getTokenType() == JavaTokenType.STRING_LITERAL) {
-            var val = tok.getText().substring(1); // Remove starting "
-            final var finalVal = val.substring(0, val.length() - 1); // Remove leading "
+            // Remove starting and leading " and unescape characters to turn from the source representation to the runtime one
+            final String value  = StringUtil.unescapeStringCharacters(StringUtil.unquoteString(tok.getText()));
             forInScope(group -> {
-                var ct = group.constants().get(finalVal);
+                var ct = group.constants().get(value);
                 if (ct != null && checkNotRecursive(ct)) {
                     replacements.replace(tok, write(ct));
                     tok.putUserData(UNPICK_WAS_REPLACED, true);
@@ -306,7 +308,7 @@ public class UnpickVisitor extends PsiRecursiveElementVisitor {
             // We'll try a direct constant first, even if it's a flag
             var ct = group.constants().get(number);
             if (ct != null && checkNotRecursive(ct)) {
-                replacements.replace(element, write(ct));
+                replacements.replace(element, writeOptionallySurround(ct));
                 element.putUserData(UNPICK_WAS_REPLACED, true);
                 replaceMinus(element);
                 return true;
@@ -337,7 +339,7 @@ public class UnpickVisitor extends PsiRecursiveElementVisitor {
             // Finally we try to apply non-strict widening from lower number types
             for (NumberType from : type.widenFrom) {
                 var lower = from.cast(number);
-                if (lower.doubleValue() == number.doubleValue()) {
+                if (lower.doubleValue() == number.doubleValue() && lower.longValue() == number.longValue()) {
                     if (replaceLiteral(element, lower, from, true)) {
                         return true;
                     }
@@ -360,7 +362,7 @@ public class UnpickVisitor extends PsiRecursiveElementVisitor {
 
     private boolean checkNotRecursive(Expression expression) {
         if (fieldContext != null && fieldContext.getContainingClass() != null && expression instanceof FieldExpression fld) {
-            return !(fld.className.equals(fieldContext.getContainingClass().getQualifiedName()) && Objects.equals(fld.fieldName, fieldContext.getName()));
+            return !(fld.className.equals(ClassUtil.getJVMClassName(fieldContext.getContainingClass())) && Objects.equals(fld.fieldName, fieldContext.getName()));
         }
         return true;
     }
@@ -400,12 +402,22 @@ public class UnpickVisitor extends PsiRecursiveElementVisitor {
         return false;
     }
 
+    /**
+     * Write the given expression, optionally surrounding it with parenthesis if
+     * it cannot be safely assumed not to need them.
+     * <p>
+     * Only literals or top-level fields will not be surrounded.
+     */
+    private String writeOptionallySurround(Expression expression) {
+        return (expression instanceof LiteralExpression || expression instanceof FieldExpression) ? write(expression) : "(" + write(expression) + ")";
+    }
+
     private String write(Expression expression) {
         StringBuilder s = new StringBuilder();
         expression.accept(new ExpressionVisitor() {
             @Override
             public void visitFieldExpression(FieldExpression fieldExpression) {
-                var cls = imports().importClass(fieldExpression.className);
+                var cls = imports().importClass(fieldExpression.className.replace("$", "."));
                 s.append(cls).append('.').append(fieldExpression.fieldName);
             }
 
@@ -419,7 +431,7 @@ public class UnpickVisitor extends PsiRecursiveElementVisitor {
             @Override
             public void visitLiteralExpression(LiteralExpression literalExpression) {
                 if (literalExpression.literal instanceof Literal.String(String value)) {
-                    s.append('\"').append(value.replace("\"", "\\\"")).append('\"');
+                    s.append('\"').append(StringUtil.escapeStringCharacters(value)).append('\"');
                 } else if (literalExpression.literal instanceof Literal.Integer i) {
                     s.append(i.value());
                 } else if (literalExpression.literal instanceof Literal.Long l) {
@@ -503,7 +515,11 @@ public class UnpickVisitor extends PsiRecursiveElementVisitor {
             }
             case CHAR -> "'" + ((char) value.intValue()) + "'";
 
-            default -> value.toString();
+            default -> switch (value) {
+                case Long l -> l + "l";
+                case Float f -> f + "f";
+                default -> value.toString();
+            };
         };
     }
 
@@ -526,18 +542,29 @@ public class UnpickVisitor extends PsiRecursiveElementVisitor {
 
         long residual = negated ? negatedResidual : orResidual;
 
-        StringBuilder replacement = new StringBuilder(write(constants.getFirst()));
+        boolean paren = false;
+
+        StringBuilder replacement = new StringBuilder(writeOptionallySurround(constants.getFirst()));
         for (int i = 1; i < constants.size(); i++) {
             replacement.append(" | ");
-            replacement.append(write(constants.get(i)));
+            replacement.append(writeOptionallySurround(constants.get(i)));
+            paren = true;
         }
 
         if (residual != 0) {
-            replacement.append(" | ").append(residual);
+            boolean isLong = residual < Integer.MIN_VALUE || residual > Integer.MAX_VALUE;
+
+            replacement.append(" | ");
+
+            // The formatAs method appends l automatically to any long value
+            // so if it's an int we downcast it to avoid it
+            replacement.append(formatAs(isLong ? (Number) residual : (Number) (int) residual, Objects.requireNonNullElse(group.format(), GroupFormat.DECIMAL)));
+
+            paren = true;
         }
 
         if (negated) {
-            return "~" + replacement;
+            return "~" + (paren ? ("(" + replacement + ")") : replacement);
         }
 
         return replacement.toString();
