@@ -61,8 +61,8 @@ Usage: jst [-hV] [--debug] [--in-format=<inputFormat>] [--libraries-list=<librar
            [--problems-report=<problemsReport>] [--classpath=<addToClasspath>]...
            [--ignore-prefix=<ignoredPrefixes>]... [--enable-parchment
            --parchment-mappings=<mappingsPath> [--[no-]parchment-javadoc]
-           [--parchment-conflict-prefix=<conflictPrefix>]] [--enable-accesstransformers
-           --access-transformer=<atFiles> [--access-transformer=<atFiles>]...
+           [--only-parchment-javadoc] [--parchment-conflict-prefix=<conflictPrefix>]]
+           [--enable-accesstransformers --access-transformer=<atFiles> [--access-transformer=<atFiles>]...
            [--access-transformer-validation=<validation>]] [--enable-interface-injection
            [--interface-injection-stubs=<stubOut>]
            [--interface-injection-marker=<annotationMarker>]
@@ -102,6 +102,9 @@ Plugin - parchment
                              existing variable names
       --[no-]parchment-javadoc
                            Whether Parchment javadocs should be applied
+      --only-parchment-javadoc
+                           Whether to only apply Parchment javadocs, skipping parameter renaming.
+                             Overrides the --[no-]parchment-javadocs setting
       --parchment-mappings=<mappingsPath>
                            The location of the Parchment mappings file
 Plugin - accesstransformers
