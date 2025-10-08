@@ -26,7 +26,7 @@ public class ParchmentTransformer implements SourceTransformer {
     )
     public boolean enableJavadoc = true;
 
-    @CommandLine.Option(names = "--only-parchment-javadoc", description = "Whether to only apply Parchment javadocs, skipping parameter renaming. Overrides the --[no-]parchment-javadocs setting")
+    @CommandLine.Option(names = "--only-parchment-javadoc", description = "Whether to only apply Parchment javadocs, skipping parameter renaming. Overrides the --[no-]parchment-javadoc setting")
     public boolean onlyJavadoc = false;
 
     @CommandLine.Option(names = "--parchment-conflict-prefix", description = "Apply the prefix specified if a Parchment parameter name conflicts with existing variable names")

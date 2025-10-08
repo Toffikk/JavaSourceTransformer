@@ -104,7 +104,7 @@ Plugin - parchment
                            Whether Parchment javadocs should be applied
       --only-parchment-javadoc
                            Whether to only apply Parchment javadocs, skipping parameter renaming.
-                             Overrides the --[no-]parchment-javadocs setting
+                             Overrides the --[no-]parchment-javadoc setting
       --parchment-mappings=<mappingsPath>
                            The location of the Parchment mappings file
 Plugin - accesstransformers
